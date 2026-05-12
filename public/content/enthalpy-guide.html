@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>එන්තැල්පි වර්ග 14 - Interactive Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans Sinhala', sans-serif;
+            background-color: #f8fafc;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        .enthalpy-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .enthalpy-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .endo-bg { background-color: #dbeafe; border-left: 5px solid #2563eb; }
+        .exo-bg { background-color: #fee2e2; border-left: 5px solid #dc2626; }
+        .both-bg { background-color: #fef3c7; border-left: 5px solid #d97706; }
+        .equation { font-family: 'Courier New', Courier, monospace; font-weight: bold; }
+        .dark-mode {
+            background-color: #0b1220 !important;
+            color: #e5edf7;
+        }
+        .dark-mode .main-card {
+            background: #121a2a !important;
+            border-color: #263247 !important;
+            box-shadow: none !important;
+        }
+        .dark-mode .title-main,
+        .dark-mode .title-sub,
+        .dark-mode .title-text,
+        .dark-mode .desc-text,
+        .dark-mode .info-text,
+        .dark-mode .footer-text {
+            color: #e5edf7 !important;
+        }
+        .dark-mode .muted-text {
+            color: #a9b7cb !important;
+        }
+        .dark-mode .input-dark {
+            background: #0f1726 !important;
+            color: #e5edf7 !important;
+            border-color: #2b3950 !important;
+        }
+        .dark-mode .input-dark::placeholder {
+            color: #8fa2bc !important;
+        }
+        .dark-mode .card-dark {
+            background: #141e2f !important;
+            border-color: #2b3950 !important;
+            box-shadow: none !important;
+        }
+        .dark-mode .modal-panel {
+            background: #0f1726 !important;
+            color: #e5edf7 !important;
+        }
+        .dark-mode .equation-dark {
+            background: #182338 !important;
+            color: #93c5fd !important;
+        }
+        .dark-mode .hook-dark {
+            background: #3c3213 !important;
+            border-color: #8f7a2a !important;
+            color: #fef3c7 !important;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-12">
+            <h1 class="title-main text-4xl md:text-5xl font-bold text-slate-800 mb-4">🧪 එන්තැල්පි වර්ග 14</h1>
+            <p class="muted-text text-lg text-slate-600">රසායනික තාප ගති විද්‍යාවේ එන්තැල්පි වෙනස්වීම් ඉතා පහසුවෙන් ඉගෙන ගනිමු.</p>
+        </header>
+
+        <section class="main-card grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div>
+                <h2 class="title-sub text-2xl font-bold text-slate-800 mb-4">සාරාංශය (Quick Overview)</h2>
+                <p class="muted-text text-slate-600 mb-6">පහත ප්‍රස්ථාරයෙන් එන්තැල්පි වර්ග 14 තාපදායක (Exothermic) සහ තාප අවශෝෂක (Endothermic) ලෙස බෙදී ඇති ආකාරය දැක්වේ. මෙය මතක තබා ගැනීමට ඉතා වැදගත් වේ.</p>
+                <div class="flex flex-wrap gap-4">
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 bg-red-500 rounded-full"></span> තාපදායක (Exo)</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 bg-blue-500 rounded-full"></span> තාප අවශෝෂක (Endo)</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-4 bg-yellow-500 rounded-full"></span> දෙවර්ගයම</div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="typeChart"></canvas>
+            </div>
+        </section>
+
+        <div class="flex flex-col md:flex-row gap-4 mb-8">
+            <input type="text" id="searchInput" placeholder="එන්තැල්පියක් සොයන්න (උදා: දහනය)..." class="input-dark flex-1 p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+            <select id="filterType" class="input-dark p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                <option value="all">සියලුම වර්ග</option>
+                <option value="exo">තාපදායක (Exo) පමණක්</option>
+                <option value="endo">තාප අවශෝෂක (Endo) පමණක්</option>
+                <option value="both">දෙවර්ගයම</option>
+            </select>
+        </div>
+
+        <div id="enthalpyGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+        <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+            <div class="modal-panel bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative">
+                <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-2xl font-bold">&times;</button>
+                <div id="modalContent"></div>
+            </div>
+        </div>
+
+        <footer class="footer-text mt-16 text-center text-slate-500 border-t pt-8">
+            <p>සම්මත තත්ත්ව: 298K (25°C) සහ 10⁵ Pa (1 bar)</p>
+            <p class="mt-2">Created for Chemistry Students - 2024</p>
+        </footer>
+    </div>
+
+    <script>
+        const enthalpyData = [
+        { id: 1, name: "සම්මත සෑදීමේ එන්තැල්පිය", en: "Standard Enthalpy of Formation", symbol: "ΔHᶿf", type: "both", def: "සම්මත තත්ත්ව යටතේ සංඝටක මූලද්‍රව්‍ය සමුද්දේශ ස්වරූපයෙන් අරඹා දී ඇති ප්‍රභේදයක මවුල 1ක් සෑදීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "දකුණුපස (ඵලය)", start: "වඩාත් ස්ථායී මූලද්‍රව්‍ය (s,g,l)", end: "කුමන හෝ සංයෝගයක්", examples: ["C(s) + 2H₂(g) → CH₄(g)", "½N₂(g) + 3/2H₂(g) → NH₃(g)", "S(s) + O₂(g) → SO₂(g)"], special: "ඕනෑම මූලද්‍රව්‍යයක සම්මත සෑදීමේ එන්තැල්පිය ශුන්‍ය වේ / 1.C (s, graphine) 2.O2(g)  3.H2(g)  4.S8(s,rombic) 5.p4(s) 6.Cl2(g) 7.Br2(l) 8.I2(s) 9.Na(s) / ΔHr = ∑ΔHf(ප්‍රතිඵල)−∑ΔH(ප්‍රතික්‍රියක)", hook: "🧱 Formation = From Elements (මූලද්‍රව්‍ය වලින් හැදෙනවා)" },
+
+
+{ id: 2, name: "සම්මත දහන එන්තැල්පිය", en: "Standard Enthalpy of Combustion", symbol: "ΔHᶿc", type: "exo", def: "සම්මත තත්ත්ව යටතේ ඇති ප්‍රභේදයකින් මවුල 1ක් සමග වැඩිපුර ඔක්සිජන් වායුව සමඟ සම්පූර්ණයෙන් දහනය වී සම්මත තත්ත්වයේ දහන පල ලබා දීමේදී සිදුවන එන්තැල්පි වෙනස්වීම", mole: "වම්පස (ප්‍රතික්‍රියකය)", start: "කුමන හෝ අවස්ථාවක පවතින ප්‍රභේදයක් (s,g,l)", end: "දහන ඵල(s,g,l)", examples: ["C(s) + O₂(g) → CO₂(g)", "CH₄(g) + 2O₂(g) → CO₂(g) + 2H₂O(l)", "H₂(g) + ½O₂(g) → H₂O(l)"], special: "ඔක්සිජන් අතිරික්තයක දහනය විය යුතුය./ හෙස්ගේ නියමය", hook: "🔥 Combustion = Completely Burn (සම්පූර්ණයෙන්ම පිච්චෙනවා)" },
+
+
+{ id: 3, name: "සම්මත බන්ධන විඝටන එන්තැල්පිය", en: "Bond Dissociation Enthalpy", symbol: "BDH / E(A-B)", type: "endo", def: "සම්මත තත්ත්ව යටතේ වායුමය ප්‍රභේදයකින් මවුල එකක් ගෙන සලකා බලනු ලබන මූලද්‍රව්‍ය දෙකක් අතර ඇති සියලු බන්ධන බිඳ හෙළා සම්මත අවස්ථාවේ ඇති වායුමය සංරචක බවට පත්කිරීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (බන්ධනය)", start: "වායුමය ප්‍රභේදයක් G", end: "වායුමය ඛණ්ඩක / පරමාණු", examples: ["H-H(g) → 2H(g)", "Cl-Cl(g) → 2Cl(g)", "C-H(g) → C(g) + H(g)"], special: "ද්වි පරමාණුක අණු සඳහා පරමාණුක එන්තැල්පිය මෙන් දෙගුණයකි. / බහුලව තියෙන බන්ධන ගණන් කරලා දෙපැත්ත සමානද කියලා බලන්න. / වමේ හැඩයට නැති ඒව බලලා ලකුණු කරන්න. ΔHr = ∑ΔH(කැඩෙන)−∑ΔH(සෑදෙන)", hook: "✂️ Bond = Break Bonds (බන්ධන කඩනවා)" },
+
+{ id: 4, name: "සම්මත පරමාණුකරණ එන්තැල්පිය / සම්මත තූකරණ එන්තැල්පිය", en: "Standard Enthalpy of Atomization", symbol: "ΔHᶿatm", type: "endo", def: "සම්මත අවස්ථාවේ ඇති යම් මූලද්‍රව්‍ය ස්වභාවික අවස්ථාවෙන් අරඹා සම්මත අවස්ථාවේ ඇති වායුමය මවුල එකක් බවට පත් කිරීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "දකුණුපස (වායුමය පරමාණුව)", start: "වඩාත් ස්ථායී මූලද්‍රව්‍ය", end: "වායුමය පරමාණු/ 1 mol", examples: ["½Cl₂(g) → Cl(g)", "Na(s) → Na(g)", "½O₂(g) → O(g)"], special: "බන්ධන බිඳීමක් සිදුවන බැවින් සෑමවිටම ධන අගයකි.", hook: "⚛️ Atomization = Atoms Only (තනි පරමාණු හැදෙනවා)" },
+
+{ id: 5, name: "සම්මත වාෂ්පීකරණ එන්තැල්පිය", en: "Standard Enthalpy of Vaporization", symbol: "ΔHᶿvap", type: "endo", def: "සම්මත තත්ත්ව යටතේ ද්‍රවයකින් මවුල 1ක් වායුමය අවස්ථාවට පත් කිරීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (ද්‍රවය)", start: "ද්‍රව අවස්ථාව", end: "වායුමය අවස්ථාව", examples: ["H₂O(l) → H₂O(g)", "Br₂(l) → Br₂(g)", "C₂H₅OH(l) → C₂H₅OH(g)"], special: "අන්තර් අණුක ආකර්ෂණ බල බිඳ දැමීමට ශක්තිය අවශ්‍ය වේ.", hook: "☁️ Vaporization = Vapor Time (වාෂ්ප වෙනවා)" },
+
+
+{ id: 6, name: "සම්මත විලයන එන්තැල්පිය", en: "Standard Enthalpy of Fusion", symbol: "ΔHᶿfus", type: "endo", def: "සම්මත තත්ත්ව යටතේ ඝන ද්‍රව්‍යයකින් මවුල 1ක් ද්‍රව අවස්ථාවට පත් කිරීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (ඝනය)", start: "ඝන අවස්ථාව", end: "ද්‍රව අවස්ථාව", examples: ["H₂O(s) → H₂O(l)", "NaCl(s) → NaCl(l)", "Fe(s) → Fe(l)"], special: "ස්ඵටික දැලිස බිඳ දැමීමට ශක්තිය අවශ්‍ය වේ.", hook: "🧊 Fusion = Freeze to Fluid (දියවෙනවා)" },
+
+
+{ id: 7, name: "සම්මත ඌර්ධවපාතන එන්තැල්පිය", en: "Standard Enthalpy of Sublimation", symbol: "ΔHᶿsub", type: "endo", def: "සම්මත තත්ත්ව යටතේ ඝන ද්‍රව්‍යයකින් මවුල 1ක් සෘජුවම වායුමය අවස්ථාවට පත් කිරීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (ඝනය)", start: "ඝන අවස්ථාව", end: "වායුමය අවස්ථාව", examples: ["I₂(s) → I₂(g)", "CO₂(s) → CO₂(g)", "C(graphite) → C(g)"], special: "ΔHᶿsub = ΔHᶿfus + ΔHᶿvap වේ.", hook: "🚀 Sublimation = Solid Up to gas Bypassing liquid (කෙලින්ම වාෂ්ප වෙනවා)" },
+
+
+{ id: 8, name: "පළමු අයනීකරණ එන්තැල්පිය", en: "First Ionization Enthalpy", symbol: "IE₁", type: "endo", def: "සම්මත තත්ත්ව යටතේ වායුමය පරමාණු මවුල 1කින් න්‍යෂ්ටියට ලිහිල්ව බැඳී ඇති ඉලෙක්ට්‍රෝන ඉවත් කර සම්මත තත්ත්ව යටතේ ඇති වායුමය එක ධන (+1) ආරෝපිත අයන මවුල 1ක් සෑදීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (වායුමය පරමාණුව)", start: "වායුමය පරමාණු", end: "+1 වායුමය කැටායන", examples: ["Na(g) → Na⁺(g) + e⁻", "Cl(g) → Cl⁺(g) + e⁻", "Mg(g) → Mg⁺(g) + e⁻"], special: "න්‍යෂ්ටික ආකර්ෂණයෙන් ඉලෙක්ට්‍රෝනය මුදවා ගැනීමට ශක්තිය අවශ්‍ය වේ./ සැම විටම දකුණු පස ධන අයනයක් සහ ඉලෙක්ට්‍රෝනයක් ඉතිරි වේ. ", hook: "➖ Ionization = I lose an electron (ඉලෙක්ට්‍රෝන නැතිවෙනවා)" },
+
+
+{ id: 9, name: "දෙවන අයනීකරණ එන්තැල්පිය", en: "Second Ionization Enthalpy", symbol: "IE₂", type: "endo", def: "සම්මත තත්ත්ව යටතේ +1 ආරෝපිත වායුමය කැටායන මවුල 1කින් එක් එක් කැටායනයෙන් එක් ඉලෙක්ට්‍රෝනය බැගින් ඉවත් කර, +2 ආරෝපිත වායුමය කැටායන මවුල 1ක් සෑදීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (+1 වායුමය කැටායනය)", start: "+1 වායුමය කැටායන", end: "+2 වායුමය කැටායන", examples: ["Na⁺(g) → Na²⁺(g) + e⁻", "Mg⁺(g) → Mg²⁺(g) + e⁻", "O⁺(g) → O²⁺(g) + e⁻"], special: "ධන ආරෝපිත අයනයකින් ඉලෙක්ට්‍රෝනයක් ඉවත් කිරීම වඩා අපහසු බැවින්, IE₂ > IE₁ වේ.", hook: "➖➖ 2nd Ionization = I lose another (තව එකක් නැතිවෙනවා)" },
+
+{ id: 10, name: "ඉලෙක්ට්‍රෝන බන්ධුතා එන්තැල්පිය : සම්මත ප්‍රථම ඉලෙක්ට්‍රෝන ලබාගැනීමේ එන්තැල්පිය", en: "Electron Affinity Enthalpy", symbol: "EA / ΔHₑₐ", type: "exo", def: "සම්මත තත්ත්ව යටතේ වායුමය පරමාණු මවුල 1කට එක් ඉලෙක්ට්‍රෝනය බැගින් එකතු කර, -1 ආරෝපිත වායුමය ඇනායන මවුල 1ක් සෑදීමේදී සිදුවන එන්තැල්පි වෙනස.", mole: "වම්පස (වායුමය පරමාණුව)", start: "වායුමය පරමාණු", end: "-1 වායුමය ඇනායන", examples: ["Cl(g) + e⁻ → Cl⁻(g)", "O(g) + e⁻ → O⁻(g)", "F(g) + e⁻ → F⁻(g)"], special: "දෙවන ඉලෙක්ට්‍රෝන බන්ධුතාව සෑමවිටම තාප අවශෝෂක වේ. සැමවිටම දකුණු පස සෘණ ඇනායනයක් ඉතිරි වේ. / බොහෝ වෙලාවට තාපදායක වන අතර සමහර වෙලාවට තාප අවශෝෂක වේ. (2 කාණ්ඩය, 18 කාණ්ඩය, N) / ඉලෙක්ට්‍රෝන බන්ධුතාවය = - ඉලෙක්ට්‍රෝනාකරණය", hook: "➕ Affinity = Attracts an electron (ඉලෙක්ට්‍රෝන අදිනවා)" },
+
+
+{ 
+id: 11, 
+name: "සම්මත ද්‍රාවණ එන්තැල්පිය", 
+en: "Standard Enthalpy of Solution", 
+symbol: "ΔHᶿsol", 
+type: "both", 
+def: "සම්මත තත්ත්ව යටතේ ප්‍රභේදයකින් මවුල 1ක් ගෙන දෙන ලද ද්‍රාවකයක අවශ්‍ය තරම් ප්‍රමාණයක දිය වී සම්මත තත්ත්වයේ ඇති 1 mol dm⁻³ ද්‍රාවණයක් සෑදීමේදී සිදුවන එන්තැල්පි වෙනස.", 
+mole: "වම්පස (ද්‍රාවණය වන ප්‍රභේදය මවුල 1ක්)", 
+start: "ඝන, ද්‍රව හෝ වායු ප්‍රභේදයේ මවුල 1ක්", 
+end: "1 mol dm⁻³ ද්‍රාවණයක්", 
+examples: [
+"NaCl(s) + aq → NaCl(aq)",
+"NH₄NO₃(s) + aq → NH₄NO₃(aq)"
+], 
+special: "ප්‍රභේදය අනුව මෙය තාප අවශෝෂක (Endothermic) හෝ තාප මෝචක (Exothermic) විය හැක.", 
+hook: "🧂 Solution = Solve in solvent (දියවෙලා ද්‍රාවණයක් හැදෙනවා)" 
+},
+
+{ 
+id: 12, 
+name: "සම්මත සද්‍රාවණ එන්තැල්පිය", 
+en: "Standard Enthalpy of Solvation", 
+symbol: "ΔHᶿsolv", 
+type: "exo", 
+def: "සම්මත අවස්ථාවේදී ඇති වායුමය අයන මවුලයක් ගෙන දෙන ලද ද්‍රාවකයක අවශ්‍ය තරම් ප්‍රමාණයක දිය වී සම්මත අවස්ථාවේ ඇති 1 mol dm⁻³ වන පරිපූර්ණ ද්‍රාවණයක් සෑදීමේදී සිදුවන එන්තැල්පි විපර්යාසයයි.", 
+mole: "වම්පස (වායුමය අයන මවුල 1ක්)", 
+start: "වායුමය අයන මවුල 1ක්", 
+end: "1 mol dm⁻³ පරිපූර්ණ ද්‍රාවණයක්", 
+examples: [
+"Na⁺(g) + solvent → Na⁺(solv)",
+"Cl⁻(g) + solvent → Cl⁻(solv)"
+], 
+special: "අයන හා ද්‍රාවක අණු අතර ආකර්ෂණ බල ඇතිවන බැවින් මෙය සෑම විටම තාප මෝචක (Exothermic) වේ.", 
+hook: "🧲 Solvation = Gas ion surrounded (වායු අයන ද්‍රාවකයෙන් වටවෙනවා)" 
+},
+
+{ 
+id: 13, 
+name: "සම්මත සජලන එන්තැල්පිය (ජලීකරණ එන්තැල්පිය)", 
+en: "Standard Enthalpy of Hydration", 
+symbol: "ΔHᶿhyd", 
+type: "exo", 
+def: "සම්මත අවස්ථාවේ වායුමය අයන මවුලයක් අවශ්‍ය තරම් ජලය ප්‍රමාණයක් තුළ දිය වී සම්මත අවස්ථාවේ ඇති 1 mol dm⁻³ වන ජලීය ද්‍රාවණයක් සෑදීමේදී සිදුවන එන්තැල්පි විපර්යාසයයි.", 
+mole: "වම්පස (වායුමය අයන මවුල 1ක්)", 
+start: "වායුමය අයන මවුල 1ක්", 
+end: "1 mol dm⁻³ ජලීය ද්‍රාවණයක් (aq)", 
+examples: [
+"Na⁺(g) + aq → Na⁺(aq)",
+"Mg²⁺(g) + aq → Mg²⁺(aq)"
+], 
+special: "සෑම විටම තාප මෝචක (Exothermic) වේ. අයනයේ ආරෝපණ ඝනත්වය (Charge density) වැඩි වන විට සජලන එන්තැල්පිය වඩාත් සෘණ වේ.", 
+hook: "🌊 Hydration = Gas ion in Water (වායු අයන වතුරේ ගිලෙනවා)" 
+},
+
+{ 
+id: 14, 
+name: "සම්මත උදාසීනකරණ එන්තැල්පිය", 
+en: "Standard Enthalpy of Neutralization", 
+symbol: "ΔHᶿn", 
+type: "exo", 
+def: "සම්මත තත්ත්වයේ ඇති ජලීය H⁺ මවුලයක් ජලීය OH⁻ මවුලයක් සමඟ ප්‍රතික්‍රියාවෙන් සම්මත තත්ත්වයේ ඇති ද්‍රව ජලය මවුලයක් සෑදීමේදී සිදුවන එන්තැල්පි විපර්යාසයයි.", 
+mole: "දකුණුපස (සෑදෙන ජලය මවුල 1ක්)", 
+start: "ජලීය H⁺ සහ OH⁻ අයන", 
+end: "ද්‍රව ජලය (H₂O(l))", 
+examples: [
+"H⁺(aq) + OH⁻(aq) → H₂O(l) ΔH = -57.2 kJ/mol"
+], 
+special: "ප්‍රබල අම්ල හා ප්‍රබල භෂ්ම සඳහා අගය නියතයකි (-57.2 kJ/mol පමණ).", 
+hook: "💧 Neutralization = New Water (අලුත් වතුර මවුල 1ක් හැදෙනවා)" 
+},
+
+{ 
+id: 15, 
+name: "දෙන ලද අම්ලයක සම්මත උදාසීනකරණ එන්තැල්පිය", 
+en: "Standard Enthalpy of Neutralization of a Given Acid", 
+symbol: "ΔHᶿn(acid)", 
+type: "exo", 
+def: "සම්මත තත්ත්වයේ ඇති දෙන ලද ජලීය අම්ලයක මවුල 1ක් අවශ්‍ය තරම් ජලීය OH⁻ හමුවේ සම්පූර්ණයෙන් උදාසීන වීමේදී සිදුවන එන්තැල්පි විපර්යාසයයි.", 
+mole: "වම්පස (අදාළ අම්ලය මවුල 1ක්)", 
+start: "අදාළ අම්ලයේ මවුල 1ක්", 
+end: "උදාසීන වූ ලවණය හා ජලය", 
+examples: [
+"HCl(aq) + NaOH(aq) → NaCl(aq) + H₂O(l)", 
+"H₂SO₄(aq) + 2NaOH(aq) → Na₂SO₄(aq) + 2H₂O(l) (මෙහි H₂SO₄ මවුල 1ක් බව සලකන්න)"
+], 
+special: "අම්ලය දුබල (Weak) නම්, අයනීකරණය වීමට ශක්තිය වැය වන නිසා නිදහස් වන තාපය (Exothermic value) අඩුවේ.", 
+hook: "🍋 Acid in focus = අම්ලය 1යි, අනිත්වා ඕන තරම්" 
+},
+
+{ 
+id: 16, 
+name: "දෙන ලද භෂ්මයක සම්මත උදාසීනකරණ එන්තැල්පිය", 
+en: "Standard Enthalpy of Neutralization of a Given Base", 
+symbol: "ΔHᶿn(base)", 
+type: "exo", 
+def: "සම්මත තත්ත්වයේ පවතින දෙන ලද භෂ්මයක මවුල 1ක් ගෙන අවශ්‍ය තරම් ජලීය H⁺ අයන හමුවේ සම්පූර්ණයෙන් උදාසීනකරණයේදී සිදුවන එන්තැල්පි විපර්යාසයයි.", 
+mole: "වම්පස (අදාළ භෂ්මය මවුල 1ක්)", 
+start: "අදාළ භෂ්මයේ මවුල 1ක්", 
+end: "උදාසීන වූ ලවණය හා ජලය", 
+examples: [
+"NaOH(aq) + HCl(aq) → NaCl(aq) + H₂O(l)", 
+"Ba(OH)₂(aq) + 2HCl(aq) → BaCl₂(aq) + 2H₂O(l) (මෙහි Ba(OH)₂ මවුල 1ක් බව සලකන්න)"
+], 
+special: "භෂ්මය දුබල (Weak) නම්, අයනීකරණයට ශක්තිය වැය වන නිසා මේ අගයෙත් විශාලත්වය (Magnitude) අඩුවේ.", 
+hook: "🧼 Base in focus = භෂ්මය 1යි, අනිත්වා ඕන තරම්" 
+}
+
+        ];
+
+        function initChart() {
+            const ctx = document.getElementById('typeChart').getContext('2d');
+            const exoCount = enthalpyData.filter(d => d.type === 'exo').length;
+            const endoCount = enthalpyData.filter(d => d.type === 'endo').length;
+            const bothCount = enthalpyData.filter(d => d.type === 'both').length;
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['තාපදායක', 'තාප අවශෝෂක', 'දෙවර්ගයම'],
+                    datasets: [{
+                        data: [exoCount, endoCount, bothCount],
+                        backgroundColor: ['#ef4444', '#3b82f6', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function getTypeClasses(type) {
+            if (type === 'exo') return 'bg-red-100 text-red-600';
+            if (type === 'endo') return 'bg-blue-100 text-blue-600';
+            return 'bg-yellow-100 text-yellow-600';
+        }
+
+        function renderCards(data) {
+            const grid = document.getElementById('enthalpyGrid');
+            grid.innerHTML = '';
+            data.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `enthalpy-card card-dark p-6 rounded-2xl cursor-pointer shadow-sm border bg-white ${item.type}-bg`;
+                card.onclick = () => showDetail(item.id);
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${getTypeClasses(item.type)}">
+                            ${item.type === 'exo' ? 'Exothermic' : item.type === 'endo' ? 'Endothermic' : 'Both'}
+                        </span>
+                        <span class="text-slate-400 font-bold">#${item.id}</span>
+                    </div>
+                    <h3 class="title-text text-xl font-bold text-slate-800 mb-2">${item.name}</h3>
+                    <p class="text-2xl font-bold text-blue-600 mb-4">${item.symbol}</p>
+                    <p class="desc-text text-sm text-slate-600 line-clamp-2">${item.def}</p>
+                    <div class="muted-text mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-semibold">
+                        <span>මවුල 1: ${item.mole}</span>
+                        <span class="text-blue-500">වැඩි විස්තර →</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function showDetail(id) {
+            const item = enthalpyData.find(d => d.id === id);
+            const modal = document.getElementById('detailModal');
+            const content = document.getElementById('modalContent');
+            content.innerHTML = `
+                <div class="mb-6">
+                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase ${getTypeClasses(item.type)}">${item.type}</span>
+                    <h2 class="title-text text-3xl font-bold text-slate-800 mt-4">${item.name}</h2>
+                    <p class="muted-text text-slate-500 italic">${item.en}</p>
+                </div>
+                <div class="space-y-6">
+                    <div class="card-dark bg-slate-50 p-4 rounded-xl">
+                        <h4 class="muted-text font-bold text-slate-700 mb-2 uppercase text-xs tracking-widest">අර්ථදැක්වීම</h4>
+                        <p class="info-text text-slate-800 leading-relaxed">${item.def}</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="card-dark border p-4 rounded-xl border-slate-100">
+                            <h4 class="muted-text font-bold text-slate-500 mb-1 text-xs">ආරම්භක ස්වභාවය</h4>
+                            <p class="info-text text-slate-800">${item.start}</p>
+                        </div>
+                        <div class="card-dark border p-4 rounded-xl border-slate-100">
+                            <h4 class="muted-text font-bold text-slate-500 mb-1 text-xs">අවසන් ස්වභාවය</h4>
+                            <p class="info-text text-slate-800">${item.end}</p>
+                        </div>
+                        <div class="card-dark border p-4 rounded-xl border-slate-100">
+                            <h4 class="muted-text font-bold text-slate-500 mb-1 text-xs">මවුල 1ක් විය යුත්තේ</h4>
+                            <p class="text-slate-800 font-bold text-blue-600">${item.mole}</p>
+                        </div>
+                        <div class="card-dark border p-4 rounded-xl border-slate-100">
+                            <h4 class="muted-text font-bold text-slate-500 mb-1 text-xs">විශේෂ කරුණු</h4>
+                            <p class="info-text text-slate-800 text-sm">${item.special}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="muted-text font-bold text-slate-700 mb-3 uppercase text-xs tracking-widest">උදාහරණ</h4>
+                        <ul class="space-y-2">
+                            ${item.examples.map(ex => `<li class="equation equation-dark bg-slate-100 p-3 rounded-lg text-blue-800 text-sm">${ex}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="hook-dark bg-yellow-50 p-6 rounded-2xl border-2 border-yellow-200">
+                        <h4 class="font-bold text-yellow-800 mb-2 flex items-center gap-2">🧠 Memory Hook</h4>
+                        <p class="text-yellow-900 font-bold text-lg">${item.hook}</p>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        function filterData() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const type = document.getElementById('filterType').value;
+            const filtered = enthalpyData.filter(item => {
+                const matchesSearch = item.name.toLowerCase().includes(query) || item.symbol.toLowerCase().includes(query);
+                const matchesType = type === 'all' || item.type === type;
+                return matchesSearch && matchesType;
+            });
+            renderCards(filtered);
+        }
+
+        document.getElementById('searchInput').oninput = filterData;
+        document.getElementById('filterType').onchange = filterData;
+
+        function applyThemeFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            const forcedTheme = params.get('theme');
+            const useDark = forcedTheme === 'dark';
+            if (useDark) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        }
+
+        window.onload = () => {
+            applyThemeFromQuery();
+            initChart();
+            renderCards(enthalpyData);
+        };
+    </script>
+</body>
+</html>
