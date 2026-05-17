@@ -25,8 +25,8 @@
       <aside class="left-panel">
         <template v-if="isProfileTab">
           <div class="brand">
-            <q-icon name="school" size="22px" color="positive" />
-            <span>EduQuest</span>
+            <img class="brand-logo" :src="appLogo" width="28" height="28" alt="" />
+            <span>Syllabus Easier</span>
           </div>
 
           <div class="profile-box">
@@ -68,9 +68,13 @@
         </template>
       </aside>
 
-      <section class="main-panel">
+      <section class="main-panel" :class="{ 'mindmap-panel-active': activeMenu === 'mindmap' }">
         <template v-if="isProfileTab">
-          <div class="hero-grid">
+          <template v-if="activeMenu === 'mindmap'">
+            <MindMapView />
+          </template>
+          <template v-else>
+            <div class="hero-grid">
             <q-card class="hero-card" flat>
               <div class="text-h3 text-weight-bolder">Level Up Your Learning! 🚀</div>
               <div class="text-subtitle1 q-mt-sm text-grey-8">
@@ -123,15 +127,29 @@
             </q-card>
           </div>
 
-          <div class="subject-grid q-mt-lg">
+          <div class="row items-center justify-between q-mt-lg">
+            <div class="text-h5 text-weight-bold">Subjects</div>
+            <q-btn color="positive" icon="add" label="Add subject" dense unelevated @click="openAddSubject" />
+          </div>
+
+          <div class="subject-grid q-mt-md">
             <q-card
               v-for="subject in subjects"
-              :key="subject.name"
+              :key="subject.id"
               class="subject-card"
               flat
               clickable
               @click="openSubject(subject)"
             >
+              <q-btn
+                class="subject-delete-btn"
+                icon="close"
+                dense
+                round
+                flat
+                color="grey-7"
+                @click.stop="removeSubject(subject.id)"
+              />
               <div class="row items-center justify-between">
                 <div>
                   <div class="text-h6 text-weight-bold">{{ subject.name }}</div>
@@ -179,6 +197,7 @@
             </div>
           </div>
         </template>
+      </template>
         <template v-else-if="isChemistryTab">
           <div class="chemistry-content-wrap">
             <iframe
@@ -190,12 +209,56 @@
         </template>
       </section>
     </div>
+
+    <q-dialog v-model="subjectDialogOpen" transition-show="scale" transition-hide="scale" @hide="onSubjectDialogHide">
+      <q-card class="subject-dialog-card">
+        <q-card-section>
+          <div class="text-h6 q-mb-md">New subject</div>
+          <q-input
+            ref="subjectNameInputRef"
+            v-model="newSubjectName"
+            label="Subject name"
+            outlined
+            dense
+            maxlength="80"
+            @keyup.enter.prevent="confirmAddSubject"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="primary" v-close-popup />
+          <q-btn color="positive" label="Add" unelevated @click="confirmAddSubject" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter, useRoute } from 'vue-router'
+import MindMapView from 'pages/MindMapView.vue'
+
+const router = useRouter()
+const route = useRoute()
+
+onMounted(() => {
+  if (route.path.includes('mindmap')) {
+    activeMenu.value = 'mindmap'
+  }
+})
+
+watch(() => route.path, (newPath) => {
+  if (newPath.includes('mindmap')) {
+    activeMenu.value = 'mindmap'
+  } else {
+    if (newPath === '/' && activeMenu.value === 'mindmap') {
+      activeMenu.value = 'study-plan'
+    }
+  }
+})
+
+import appLogo from '../assets/app-logo.png'
 
 const $q = useQuasar()
 
@@ -217,13 +280,84 @@ const sideMenu = [
   { label: 'Study Plan', value: 'study-plan', icon: 'event_note' },
   { label: 'Flashcards', value: 'flashcards', icon: 'quiz' },
   { label: 'Achievements', value: 'achievements', icon: 'emoji_events' },
+  { label: 'Mind Map', value: 'mindmap', icon: 'hub' },
 ]
 
+function newSubjectId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+  return `sub-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 const subjects = ref([
-  { name: 'Chemistry', level: 8, progress: 0.74, icon: 'science', color: 'orange' },
-  { name: 'Physics', level: 6, progress: 0.52, icon: 'timeline', color: 'deep-purple' },
-  { name: 'Maths', level: 10, progress: 0.89, icon: 'calculate', color: 'teal' },
+  {
+    id: newSubjectId(),
+    name: 'Chemistry',
+    level: 8,
+    progress: 0.74,
+    icon: 'science',
+    color: 'orange',
+  },
+  {
+    id: newSubjectId(),
+    name: 'Physics',
+    level: 6,
+    progress: 0.52,
+    icon: 'timeline',
+    color: 'deep-purple',
+  },
+  {
+    id: newSubjectId(),
+    name: 'Maths',
+    level: 10,
+    progress: 0.89,
+    icon: 'calculate',
+    color: 'teal',
+  },
 ])
+
+const subjectDialogOpen = ref(false)
+const newSubjectName = ref('')
+const subjectNameInputRef = ref(null)
+
+function openAddSubject() {
+  newSubjectName.value = ''
+  subjectDialogOpen.value = true
+  nextTick(() => {
+    subjectNameInputRef.value?.focus?.()
+  })
+}
+
+function onSubjectDialogHide() {
+  newSubjectName.value = ''
+  nextTick(() => {
+    subjectNameInputRef.value?.blur?.()
+    globalThis.document?.body?.style?.removeProperty?.('overflow')
+  })
+}
+
+function confirmAddSubject() {
+  const name = newSubjectName.value.trim()
+  if (!name) {
+    $q.notify({ message: 'Enter a subject name', color: 'warning', position: 'top-right', timeout: 1400 })
+    return
+  }
+  subjects.value.push({
+    id: newSubjectId(),
+    name,
+    level: 1,
+    progress: 0,
+    icon: 'menu_book',
+    color: 'deep-purple',
+  })
+  subjectDialogOpen.value = false
+  notify(`${name} added`)
+}
+
+function removeSubject(id) {
+  subjects.value = subjects.value.filter((item) => item.id !== id)
+}
 
 const quests = ref([
   {
@@ -251,6 +385,11 @@ function notify(message) {
 
 function selectMenu(value) {
   activeMenu.value = value
+  if (value === 'mindmap') {
+    router.push('/mindmap')
+  } else {
+    router.push('/')
+  }
   notify(`Opened ${sideMenu.find((item) => item.value === value)?.label}`)
 }
 
@@ -372,6 +511,25 @@ function toggleQuest(questId) {
   font-weight: 700;
 }
 
+.brand-logo {
+  display: block;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.subject-dialog-card {
+  min-width: 300px;
+}
+
+.subject-delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+}
+
 .profile-box {
   display: flex;
   align-items: center;
@@ -463,9 +621,10 @@ function toggleQuest(questId) {
 }
 
 .subject-card {
+  position: relative;
   border-radius: 16px;
   background: #f0f5f1;
-  padding: 16px;
+  padding: 16px 36px 16px 16px;
 }
 
 .quest-grid {
@@ -603,5 +762,12 @@ function toggleQuest(questId) {
     transform: none;
     min-width: 84px;
   }
+}
+
+.mindmap-panel-active {
+  padding: 0 !important;
+  height: calc(100vh - 96px) !important;
+  position: relative;
+  overflow: hidden;
 }
 </style>
