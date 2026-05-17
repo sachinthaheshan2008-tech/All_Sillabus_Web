@@ -1,13 +1,23 @@
 <script setup>
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted, provide } from 'vue';
 import { useQuasar } from 'quasar';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import katex from 'katex';
 
 // Import custom utilities and state
 import CustomMindMapNode from '../components/CustomMindMapNode.vue';
+import CustomMindMapEdge from '../components/CustomMindMapEdge.vue';
 import { useLayout } from '../composables/useLayout';
 import { useMindMapStore } from '../stores/useMindMapStore';
+
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'edit',
+  },
+});
+
+provide('mindmapMode', computed(() => props.mode));
 
 // Initialize Quasar and Vue Flow utilities
 const $q = useQuasar();
@@ -19,6 +29,14 @@ const { fitView, zoomIn, zoomOut } = useVueFlow();
 const nodeTypes = {
   customMindmap: CustomMindMapNode,
 };
+
+// Register custom edge
+const edgeTypes = {
+  customMindmapEdge: CustomMindMapEdge,
+};
+
+// Track connection drags for n8n style node creation
+const ongoingConnection = ref(null);
 
 // UI Reactive State
 const drawerOpen = ref(true);
@@ -79,9 +97,11 @@ const initializeEmptyMap = () => {
     data: {
       level: 0,
       label: 'Central Theme $E = mc^2$',
+      isRevealed: true,
       onAddChild: initiateAddChild,
       onDeleteNode: initiateDeleteNode,
       onEditNode: initiateEditNode,
+      onToggleCollapse: toggleNodeCollapse,
     },
   };
 
@@ -147,6 +167,153 @@ const initiateEditNode = (nodeId) => {
 };
 
 /**
+ * Toggles collapse/expand state for a node's children and triggers layouter coordinates updates.
+ */
+const toggleNodeCollapse = (nodeId) => {
+  const node = store.currentMap.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!node.data) node.data = {};
+  
+  const willCollapse = !node.data.isCollapsed;
+  node.data.isCollapsed = willCollapse;
+  
+  // Recursive helper to set hidden status for descendants
+  const setDescendantsHidden = (parentId, isHidden) => {
+    const childEdges = store.currentMap.edges.filter(e => e.source === parentId);
+    const childIds = childEdges.map(e => e.target);
+    
+    for (const childId of childIds) {
+      const childNode = store.currentMap.nodes.find(n => n.id === childId);
+      if (childNode) {
+        childNode.hidden = isHidden;
+        
+        // If hiding, hide all descendants recursively.
+        // If showing, only show descendants if this child is NOT collapsed itself!
+        if (isHidden) {
+          setDescendantsHidden(childId, true);
+        } else {
+          if (!childNode.data?.isCollapsed) {
+            setDescendantsHidden(childId, false);
+          }
+        }
+      }
+    }
+  };
+  
+  setDescendantsHidden(nodeId, willCollapse);
+  
+  nextTick(() => {
+    recalculateLayout();
+  });
+};
+
+/**
+ * Handlers connection drawing between nodes in Edit Mode.
+ */
+const onConnectStart = ({ nodeId, handleType }) => {
+  if (props.mode !== 'edit') return;
+  if (handleType === 'source') {
+    ongoingConnection.value = { sourceNodeId: nodeId, connected: false };
+  }
+};
+
+const onConnect = (connection) => {
+  if (props.mode !== 'edit') return;
+  
+  if (ongoingConnection.value) {
+    ongoingConnection.value.connected = true;
+  }
+  
+  const edgeId = `edge_${connection.source}_${connection.target}`;
+  
+  // Prevent duplicate edges
+  const exists = store.currentMap.edges.some(
+    e => e.source === connection.source && e.target === connection.target
+  );
+  if (exists) return;
+  
+  const newEdge = {
+    id: edgeId,
+    source: connection.source,
+    target: connection.target,
+    type: 'customMindmapEdge',
+  };
+  
+  store.currentMap.edges.push(newEdge);
+  
+  nextTick(() => {
+    recalculateLayout();
+  });
+};
+
+const onConnectEnd = () => {
+  if (props.mode !== 'edit') return;
+  if (ongoingConnection.value && !ongoingConnection.value.connected) {
+    const parentId = ongoingConnection.value.sourceNodeId;
+    ongoingConnection.value = null;
+    initiateAddChild(parentId);
+  } else {
+    ongoingConnection.value = null;
+  }
+};
+
+/**
+ * Allows double-clicking a connection path to delete it in Edit Mode.
+ */
+const onEdgeDoubleClick = ({ edge }) => {
+  if (props.mode !== 'edit') return;
+  
+  $q.dialog({
+    title: 'Delete Connection?',
+    message: 'Are you sure you want to remove this connection path between nodes?',
+    cancel: true,
+    persistent: true,
+    ok: {
+      color: 'negative',
+      label: 'Delete Path',
+    },
+  }).onOk(() => {
+    store.currentMap.edges = store.currentMap.edges.filter(e => e.id !== edge.id);
+    nextTick(() => {
+      recalculateLayout();
+    });
+    $q.notify({
+      type: 'warning',
+      message: 'Connection path removed successfully.',
+      position: 'top',
+      timeout: 1500,
+    });
+  });
+};
+
+/**
+ * Computed property to check if all non-root nodes are currently revealed.
+ */
+const allNodesRevealed = computed(() => {
+  const nonRootNodes = store.currentMap.nodes.filter(n => n.data && n.data.level !== 0);
+  if (nonRootNodes.length === 0) return true;
+  return nonRootNodes.every(n => n.data.isRevealed);
+});
+
+/**
+ * Toggles the reveal state on all non-root nodes for Active Recall mode.
+ */
+const toggleAllRecallNodes = () => {
+  const willReveal = !allNodesRevealed.value;
+  store.currentMap.nodes.forEach(node => {
+    if (node.data && node.data.level !== 0) {
+      node.data.isRevealed = willReveal;
+    }
+  });
+  $q.notify({
+    type: 'info',
+    message: willReveal ? 'All nodes revealed.' : 'All non-root nodes hidden for Active Recall.',
+    position: 'top',
+    timeout: 2000,
+  });
+};
+
+/**
  * Confirms and processes recursive branch/subtree deletion.
  */
 const initiateDeleteNode = (nodeId) => {
@@ -209,9 +376,11 @@ const handleSaveNode = () => {
       data: {
         level: newLevel,
         label: nodeLabelInput.value,
+        isRevealed: false,
         onAddChild: initiateAddChild,
         onDeleteNode: initiateDeleteNode,
         onEditNode: initiateEditNode,
+        onToggleCollapse: toggleNodeCollapse,
       },
     };
 
@@ -219,6 +388,7 @@ const handleSaveNode = () => {
       id: `edge_${parentId}_${newId}`,
       source: parentId,
       target: newId,
+      type: 'customMindmapEdge',
     };
 
     store.currentMap.nodes.push(newNode);
@@ -283,11 +453,21 @@ const loadSavedMap = (id) => {
       ...node,
       data: {
         ...node.data,
+        isRevealed: node.data.isRevealed !== undefined ? node.data.isRevealed : (node.data.level === 0),
         onAddChild: initiateAddChild,
         onDeleteNode: initiateDeleteNode,
         onEditNode: initiateEditNode,
+        onToggleCollapse: toggleNodeCollapse,
       },
     }));
+
+    // Ensure all edges use the custom component for delete buttons
+    if (store.currentMap.edges) {
+      store.currentMap.edges = store.currentMap.edges.map(edge => ({
+        ...edge,
+        type: 'customMindmapEdge',
+      }));
+    }
 
     $q.notify({
       type: 'info',
@@ -472,19 +652,23 @@ onMounted(() => {
             <div>
               <div class="text-weight-bold text-caption tracking-wider" :class="$q.dark.isActive ? 'text-slate-400' : 'text-slate-500'">ACTIVE MIND CANVAS</div>
               <div
-                class="text-subtitle2 text-weight-bold flex items-center cursor-pointer edit-title-hover" :class="$q.dark.isActive ? 'text-white' : 'text-slate-800'"
-                @click="openEditTitleDialog"
+                class="text-subtitle2 text-weight-bold flex items-center edit-title-hover" :class="[$q.dark.isActive ? 'text-white' : 'text-slate-800', props.mode === 'edit' ? 'cursor-pointer' : 'cursor-default']"
+                @click="props.mode === 'edit' && openEditTitleDialog()"
               >
                 {{ store.currentMap.title }}
-                <q-icon name="edit" size="xs" class="q-ml-xs text-grey-5" />
+                <q-icon v-if="props.mode === 'edit'" name="edit" size="xs" class="q-ml-xs text-grey-5" />
               </div>
             </div>
           </div>
 
           <!-- Main Zoom and Layout Toolbar -->
           <div class="all-pointer-events q-py-xs q-px-sm rounded-borders shadow-8 flex items-center q-gutter-sm controls-card" :class="$q.dark.isActive ? 'bg-slate-950-glass border-slate-800' : 'bg-white-glass border-slate-200'">
-            <q-btn round flat dense color="primary" icon="save" size="md" @click="saveMap">
+            <q-btn v-if="props.mode === 'edit'" round flat dense color="primary" icon="save" size="md" @click="saveMap">
               <q-tooltip>Save Mind Map</q-tooltip>
+            </q-btn>
+            
+            <q-btn v-if="props.mode === 'view'" round flat dense color="purple" :icon="allNodesRevealed ? 'visibility_off' : 'visibility'" size="md" @click="toggleAllRecallNodes">
+              <q-tooltip>{{ allNodesRevealed ? 'Hide All Nodes (Active Recall)' : 'Reveal All Nodes' }}</q-tooltip>
             </q-btn>
             
             <q-separator vertical :dark="$q.dark.isActive" :class="$q.dark.isActive ? 'bg-slate-800' : 'bg-slate-200'" class="q-my-sm" />
@@ -504,7 +688,7 @@ onMounted(() => {
             <q-btn round flat dense color="accent" icon="auto_awesome" size="md" @click="recalculateLayout">
               <q-tooltip>Auto Layout Waterfall</q-tooltip>
             </q-btn>
-            <q-btn round flat dense color="negative" icon="delete_sweep" size="md" @click="clearCanvas">
+            <q-btn v-if="props.mode === 'edit'" round flat dense color="negative" icon="delete_sweep" size="md" @click="clearCanvas">
               <q-tooltip>Clear Workspace</q-tooltip>
             </q-btn>
           </div>
@@ -516,10 +700,15 @@ onMounted(() => {
             v-model:nodes="store.currentMap.nodes"
             v-model:edges="store.currentMap.edges"
             :node-types="nodeTypes"
+            :edge-types="edgeTypes"
             :min-zoom="0.2"
             :max-zoom="4"
             fit-view-on-init
             @node-double-click="onNodeDoubleClick"
+            @connect-start="onConnectStart"
+            @connect="onConnect"
+            @connect-end="onConnectEnd"
+            @edge-double-click="onEdgeDoubleClick"
             class="mindmap-flow"
           />
         </div>
@@ -813,6 +1002,11 @@ onMounted(() => {
 }
 .q-layout-container .q-layout--containerized {
   height: 100% !important;
+}
+
+/* Smooth fluid transition animations for nodes gliding across coordinates */
+.vue-flow__node {
+  transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.2s ease-in-out !important;
 }
 </style>
 

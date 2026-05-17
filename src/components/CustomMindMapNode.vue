@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { Handle } from '@vue-flow/core';
 import { useQuasar } from 'quasar';
 import katex from 'katex';
@@ -31,6 +31,34 @@ const props = defineProps({
 const emit = defineEmits(['add-child', 'delete-node', 'edit-node']);
 
 const $q = useQuasar();
+
+import { useMindMapStore } from '../stores/useMindMapStore';
+const store = useMindMapStore();
+
+const mode = inject('mindmapMode', computed(() => 'edit'));
+
+const hasChildren = computed(() => {
+  return store.currentMap?.edges?.some(e => e.source === props.id) ?? false;
+});
+
+const isCollapsed = computed(() => !!props.data?.isCollapsed);
+
+const isRevealed = computed(() => props.data?.isRevealed !== false);
+
+const onToggleCollapseClick = (e) => {
+  e.stopPropagation();
+  if (props.data?.onToggleCollapse) {
+    props.data.onToggleCollapse(props.id);
+  }
+};
+
+const onRevealClick = (e) => {
+  e.stopPropagation();
+  const node = store.currentMap?.nodes?.find(n => n.id === props.id);
+  if (node && node.data) {
+    node.data.isRevealed = true;
+  }
+};
 
 // Deep KaTeX and inline markdown parser
 const parsedLabelHtml = computed(() => {
@@ -156,7 +184,12 @@ const onEditClick = (e) => {
       type="target"
       :position="targetPosition"
       class="mindmap-handle target-handle"
-    />
+      :class="{ 'n8n-target-handle': mode === 'edit' }"
+    >
+      <q-tooltip v-if="mode === 'edit'" anchor="top middle" self="bottom middle" :offset="[6, 6]">
+        Input Connection Handle
+      </q-tooltip>
+    </Handle>
 
     <!-- Sleek Quasar card with depth-based gradient colors -->
     <q-card
@@ -164,7 +197,7 @@ const onEditClick = (e) => {
       :style="depthStyles"
     >
       <!-- Premium floating toolbar appearing on hover -->
-      <div class="mindmap-node-actions q-gutter-xs q-pa-xs">
+      <div v-if="mode === 'edit'" class="mindmap-node-actions q-gutter-xs q-pa-xs">
         <q-btn
           round
           dense
@@ -206,15 +239,56 @@ const onEditClick = (e) => {
 
       <!-- Card Content: Safe HTML to render equations and text together -->
       <q-card-section class="q-pa-xs node-content-section">
-        <div class="node-label text-weight-medium" v-html="parsedLabelHtml"></div>
+        <div v-if="mode === 'edit' || isRevealed" class="node-label text-weight-medium" v-html="parsedLabelHtml"></div>
+        
+        <!-- Active Recall Hidden Mode Placeholder -->
+        <div v-else class="q-pa-xs flex flex-center column q-gutter-xs active-recall-section">
+          <q-btn
+            round
+            unelevated
+            size="sm"
+            color="purple-6"
+            icon="visibility"
+            class="reveal-eye-btn shadow-3"
+            @click="onRevealClick"
+          >
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Reveal math formula / content
+            </q-tooltip>
+          </q-btn>
+          <div class="text-caption text-grey-5 uppercase text-weight-bold tracking-wider" style="font-size: 8px;">Tap to Recall</div>
+        </div>
       </q-card-section>
     </q-card>
+
+    <!-- Collapse/Expand Branch Toggler Arrow -->
+    <div v-if="hasChildren" class="collapse-toggle-container flex flex-center absolute">
+      <q-btn
+        round
+        dense
+        size="8px"
+        :color="$q.dark.isActive ? 'slate-900' : 'white'"
+        :text-color="$q.dark.isActive ? 'white' : 'slate-800'"
+        :icon="isCollapsed ? 'keyboard_arrow_down' : 'keyboard_arrow_up'"
+        class="collapse-toggle-btn shadow-3 border-slate-700"
+        @click="onToggleCollapseClick"
+      >
+        <q-tooltip>{{ isCollapsed ? 'Expand subtopics' : 'Collapse subtopics' }}</q-tooltip>
+      </q-btn>
+    </div>
 
     <Handle
       type="source"
       :position="sourcePosition"
-      class="mindmap-handle source-handle"
-    />
+      class="mindmap-handle source-handle flex flex-center"
+      :class="{ 'n8n-source-handle': mode === 'edit' }"
+      @click.stop="mode === 'edit' && onAddChildClick($event)"
+    >
+      <q-icon v-if="mode === 'edit'" name="add" size="12px" class="handle-plus-icon" />
+      <q-tooltip v-if="mode === 'edit'" anchor="top middle" self="bottom middle" :offset="[6, 6]">
+        Drag wire to connect / Click to add node (n8n style)
+      </q-tooltip>
+    </Handle>
   </div>
 </template>
 
@@ -276,16 +350,59 @@ const onEditClick = (e) => {
 
 /* Custom handles for Vue Flow */
 .mindmap-handle {
-  width: 10px !important;
-  height: 10px !important;
+  width: 12px !important;
+  height: 12px !important;
   background-color: #38bdf8 !important;
   border: 2px solid #0f172a !important;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .mindmap-handle:hover {
-  transform: scale(1.3);
+  transform: scale(1.4);
   background-color: #0ea5e9 !important;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.6);
+}
+
+.n8n-source-handle {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  z-index: 102;
+}
+
+.n8n-source-handle:hover {
+  transform: scale(1.25);
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%) !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+}
+
+.n8n-source-handle:active {
+  cursor: grabbing;
+}
+
+.handle-plus-icon {
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.n8n-target-handle {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 102;
+}
+
+.n8n-target-handle:hover {
+  transform: scale(1.3);
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.8);
 }
 
 /* Styling formulas rendered inside Vue Flow */
@@ -294,5 +411,36 @@ const onEditClick = (e) => {
 }
 :deep(.katex) {
   font-size: 1.1em;
+}
+
+/* Styling Active Recall active states */
+.active-recall-section {
+  min-height: 52px;
+}
+.reveal-eye-btn {
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
+}
+.reveal-eye-btn:hover {
+  transform: scale(1.15) rotate(5deg);
+}
+
+/* Branch collapse/expand toggler centering offset styling */
+.collapse-toggle-container {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 101;
+}
+
+.collapse-toggle-btn {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.collapse-toggle-btn:hover {
+  transform: scale(1.2);
 }
 </style>

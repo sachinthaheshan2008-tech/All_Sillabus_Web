@@ -68,10 +68,10 @@
         </template>
       </aside>
 
-      <section class="main-panel" :class="{ 'mindmap-panel-active': activeMenu === 'mindmap' }">
+      <section class="main-panel" :class="{ 'mindmap-panel-active': activeMenu === 'mindmap-view' || activeMenu === 'mindmap-edit' }">
         <template v-if="isProfileTab">
-          <template v-if="activeMenu === 'mindmap'">
-            <MindMapView />
+          <template v-if="activeMenu === 'mindmap-view' || activeMenu === 'mindmap-edit'">
+            <MindMapView :mode="activeMenu === 'mindmap-edit' ? 'edit' : 'view'" />
           </template>
           <template v-else>
             <div class="hero-grid">
@@ -243,16 +243,20 @@ const router = useRouter()
 const route = useRoute()
 
 onMounted(() => {
-  if (route.path.includes('mindmap')) {
-    activeMenu.value = 'mindmap'
+  if (route.path.includes('mindmap-edit')) {
+    activeMenu.value = 'mindmap-edit'
+  } else if (route.path.includes('mindmap-view') || route.path.includes('mindmap')) {
+    activeMenu.value = 'mindmap-view'
   }
 })
 
 watch(() => route.path, (newPath) => {
-  if (newPath.includes('mindmap')) {
-    activeMenu.value = 'mindmap'
+  if (newPath.includes('mindmap-edit')) {
+    activeMenu.value = 'mindmap-edit'
+  } else if (newPath.includes('mindmap-view') || newPath.includes('mindmap')) {
+    activeMenu.value = 'mindmap-view'
   } else {
-    if (newPath === '/' && activeMenu.value === 'mindmap') {
+    if (newPath === '/' && (activeMenu.value === 'mindmap-view' || activeMenu.value === 'mindmap-edit')) {
       activeMenu.value = 'study-plan'
     }
   }
@@ -280,7 +284,8 @@ const sideMenu = [
   { label: 'Study Plan', value: 'study-plan', icon: 'event_note' },
   { label: 'Flashcards', value: 'flashcards', icon: 'quiz' },
   { label: 'Achievements', value: 'achievements', icon: 'emoji_events' },
-  { label: 'Mind Map', value: 'mindmap', icon: 'hub' },
+  { label: 'Mind Map View', value: 'mindmap-view', icon: 'visibility' },
+  { label: 'Mind Map Edit', value: 'mindmap-edit', icon: 'edit' },
 ]
 
 function newSubjectId() {
@@ -385,8 +390,10 @@ function notify(message) {
 
 function selectMenu(value) {
   activeMenu.value = value
-  if (value === 'mindmap') {
-    router.push('/mindmap')
+  if (value === 'mindmap-view') {
+    router.push('/mindmap-view')
+  } else if (value === 'mindmap-edit') {
+    router.push('/mindmap-edit')
   } else {
     router.push('/')
   }

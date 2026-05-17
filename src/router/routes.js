@@ -4,7 +4,9 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('pages/IndexPage.vue') },
-      { path: 'mindmap', component: () => import('pages/IndexPage.vue') }
+      { path: 'mindmap', component: () => import('pages/IndexPage.vue') },
+      { path: 'mindmap-view', component: () => import('pages/IndexPage.vue') },
+      { path: 'mindmap-edit', component: () => import('pages/IndexPage.vue') }
     ],
   },
 
